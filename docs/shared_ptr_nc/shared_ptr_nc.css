@@ -1,0 +1,16 @@
+@charset "UTF-8";
+/* CSS Document */
+
+body p {
+	font-family: times;
+}
+h1 {
+	font-family: helvetica;
+	font-style: bold;
+	font-size: 18px;
+}
+h2 {
+	font-family: helvetica;
+	font-style: bold;
+	font-size: 14px;
+}

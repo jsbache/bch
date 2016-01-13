@@ -1,0 +1,189 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+<link href="shared_ptr_nc.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<h1>This project is a basic implementation of a non-concurrent shared pointer.</h1>
+<p>The  purpose of the implementation is to provide a way to determine  performance implications of  thread synchronization in std::shared_ptr.</p>
+<p>std::shared_ptr has the following concurrency properties:</p>
+<ul>
+  <li>You can manage the lifetime of a shared object concurrently from several threads using different std::shared_ptr instances.</li>
+  <li>You cannot share a single std::shared instance between threads without using an external mutex system.</li>
+</ul>
+<p>This concurrency comes with a price because any reference count change must be thread synchronized.<br>
+If you are managing objects concurrently from several threads then this price is unavoidable and thus acceptable. If you are using a shared_ptr to manage an instance from a single thread, then the price is unnecessary.<br>
+Most use cases of shared_ptr that I have come across does not need to manage shared objects concurrently from multiple threads.</p>
+<p>Memory invalidation is a CPU function and as such the price is paid by the system and other processes are affected.</p>
+<p>To make matters worse, a number of software projects use architectures that pass shared_ptr's by value. Passing a shared_ptr by value change its reference count twice, causing two memory bus invalidations.</p>
+<p>shared_ptr_nc is an implementation that is compatible with std::shared_ptr for many use cases. A particular object may only be managed from one thread at a time. A shared_ptr_nc instance may be transferred between threads, but multiple shared_ptr_nc instances for a particular object must all reside on the same thread.</p>
+<p>The conclusion of this project is that one should be careful when using shared_ptrs for memory bus reasons. While the actual times are small, one should strive towards architectures that utilize the target hardware optimally.</p>
+<p>The following policy should be adopted when using shared pointers:</p>
+<ul>
+  <li>Methods that do not need to retain an instance past the function scope should be called with a raw pointer or reference.</li>
+  <li>Methods that might need to retain an instance past the function scope should be called with a reference to a const shared_ptr.<br>
+  </li>
+</ul>
+<p>One way of thinking of this, is to view a shared_ptr as a combination of an instance and its memory management structure. You only need to pass the entire information when the callee needs to perform operations that affect the memory management information. If the callee only needs to access the instance, then only the instance should be passed. This is an example of maximizing usage by declaring a minimal interface.</p>
+Example of how to property use shared_ptr's when calling methods.
+<pre>
+  typedef int MyObject;</pre>
+<pre>  void Foo(MyObject&amp; object) {
+   . . .
+   }</pre>
+<pre>  void Bar(const std::shared_ptr&lt;MyObject&gt;&amp; pointer) {
+   . . .
+   }</pre>
+<pre>  void Baz() {
+   MyObjectPtr instance;
+   Foo(*instance);
+   Bar(instance);
+   }
+</pre>
+When calling Bar, we want to use a const shared_ptr rather than a straight shared_ptr because we want to ensure that the called function does not release the pointer.
+<p>Comparisons.<br>
+  If we compare usage of std::shared_ptr with shared_ptr_nc, we see that std::shared_ptr performs worse as the concurrency increases.</p>
+<p>For 1 thread we have: </p>
+<table width="300" border="0" align="center">
+  <tbody>
+    <tr>
+      <td width="219">Time with std::shared_ptr (us)</td>
+      <td width="71">1.69723</td>
+    </tr>
+    <tr>
+      <td>Time with shared_ptr_nc (us)</td>
+      <td>0.404006</td>
+    </tr>
+    <tr>
+      <td>Delta (std time / nc time)</td>
+      <td> 420.101</td>
+    </tr>
+  </tbody>
+</table>
+<p>For 39 threads we have: </p>
+<table width="300" border="0" align="center">
+  <tbody>
+    <tr>
+      <td width="219">Time with std::shared_ptr (us)</td>
+      <td width="71">7468.39</td>
+    </tr>
+    <tr>
+      <td>Time with shared_ptr_nc (us)</td>
+      <td>1570.2</td>
+    </tr>
+    <tr>
+      <td>Delta (std time / nc time)</td>
+      <td>475.633</td>
+    </tr>
+  </tbody>
+</table>
+<p>If we (temporarily) change shared_ptr_nc to use thread synchronized types, then we get:<br>
+One thread:</p>
+<table width="300" border="0" align="center">
+  <tbody>
+    <tr>
+      <td width="219">Time with std::shared_ptr (us)</td>
+      <td width="71">1.78442</td>
+    </tr>
+    <tr>
+      <td>Time with shared_ptr_nc (us)</td>
+      <td>1.75108</td>
+    </tr>
+    <tr>
+      <td>Delta (std time / nc time)</td>
+      <td>101.904</td>
+    </tr>
+  </tbody>
+</table>
+<p>39 threads:</p>
+<table width="300" border="0" align="center">
+  <tbody>
+    <tr>
+      <td width="219">Time with std::shared_ptr (us)</td>
+      <td width="71">7382.23</td>
+    </tr>
+    <tr>
+      <td>Time with shared_ptr_nc (us)</td>
+      <td>7282.1</td>
+    </tr>
+    <tr>
+      <td>Delta (std time / nc time)</td>
+      <td>101.375</td>
+    </tr>
+  </tbody>
+</table>
+<p>This shows that memory synchronization is (relatively) slow, and that it causes the non linear delta between std::shared_ptr and shared_ptr_nc.</p>
+<p align="center"><img src="performance_normalized.png" width="800" height="473" alt=""/></p>
+<p>The
+figure illustrates the relative performance of a thread synchronized and a non-concurrent implementation of shared pointer.</p>
+<h1>Implementation notes.</h1>
+<p>Conceptually a shared/weak pointer architecture operates with three pieces of information:</p>
+<ul>
+  <li>A managed, shared instance. This is the instance that the shared pointer should destroy when the last strong reference goes away.</li>
+  <li>A number of shared/weak pointer objects that reference the managed instance.</li>
+  <li>Shared usage information: number of strong and weak references.</li>
+</ul>
+<p>Shared information is placed in a control block which is managed on the heap.</p>
+<p>This is illustrated in the following figure</p>
+<pre>   weak-pointer \
+   shared-pointer-&gt; control-block	-&gt; instance
+   shared-pointer /</pre>
+<p>The responsibility of the shared pointer and the weak pointer classes its to ensure that the strong and the weak reference count is properly updated in the control block, when shared/weak pointer instances are created and deleted.<br>
+  The basic rules are:</p>
+<ul>
+  <li>When the last strong pointer goes away, then the shared instance must be deleted.</li>
+  <li>When both strong and weak references reach 0, then the control block must be deleted.<br>
+  </li>
+</ul>
+<p>The following discusses functionality aspects of shared/weak pointers and describe how this influences the implementation.</p>
+<h2>Efficiency</h2>
+<p>We want the access to the shared instance in the shared pointer to be  efficient. We know that when we have a strong pointer, then the managed instance is live (or null). This means that we can make the pointer accessor an inlined member field access without any logic.</p>
+<h2>Type promotion</h2>
+<p>
+We'd like to ensure that shared pointers have the same flexibility as raw pointers. This means that we should be allowed to use base and sub-classes of the instance type. As an example, if we have two classes Base and Derived, then we should be allowed to do the following:</p>
+<pre> shared_ptr&lt;Derived&gt; var1(new Derived);
+ shared_ptr&lt;Base&gt; var2(var1);
+</pre>
+<p>In this case, we have a single control block with a strong reference count of 2. var1 is a &quot;facet&quot; that points to the Derived v-table of the shared instance. var2 is a &quot;facet&quot; that points to the &quot;Base&quot; v-table of the shared instance. The shared instance is deleted when var1 and var2 goes out of scope.</p>
+<p>Due to the efficiency requirement, this means that a shared pointer instance must store its facet. If it did not, we would have to make the pointer accessor in the shared pointer return the v-table for the shared pointer plus a v-table offset matching the desired facet.</p>
+<p>If the instance pointers are stored in the shared (and weak) pointers, then one might think that we could omit the instance pointer from the control block. This is not the case due to &quot;symmetry&quot;. See next.</p>
+<h2>Instance destruction</h2>
+<p>When a shared instance is deleted, which destructor should we call?<br>
+  Consider the following:<br>
+  </p>
+<pre>   struct A { };
+   struct B: public A { };</pre>
+<pre>   shared_ptr&lt;A&gt; a(new B);
+   shared_ptr&lt;B&gt; b(a);</pre>
+
+<p>In this case a and b points to the same instance. The shared pointers have different type information (A and B). If we reset b first, then which destructor should be called?</p>
+<p>This is an issue as destructors may not be virtual, and if we call the destructor of A, then we get undefined behavior.
+  The solution is that a shared pointer must &quot;capture&quot; the type at assignment time. It will use that type when destroying the instance. This means that in the example, the order of which a and b are reset is irrelevant as it is the type that is used when a was created that is used.</p>
+<p>As an aside, you can transfer an instance to a shared pointer in the constructor and in reset, and both of these mechanisms must capture the assignment type. The assignment type must be stored in shared data, so any shared pointer can access it when the strong reference count goes to 0.</p>
+<p>We can't make the control block a template with the assignment type, because this would cause severe use case restrictions. If we did, we would always have to specify two types when we create a shared pointer (shared_ptr&lt;DesiredType, AssignmentType&gt;).
+  The assignment type is somewhat arbitrary and controlled by the caller, not the consumer of the value, so this is a really bad design.</p>
+<p>Instead we &quot;type erase&quot; the assignment type from the control block by using an interface + template sub-class. When a control block is created we always instantiate a sub-class that is specific to the assignment type. The control block then becomes a pure virtual base class that can invoke the desired destructor in the base class.</p>
+<p>This destruction issue means that one should always use the most derived type when assigning to a shared pointer.<br>
+  The following can create undefined behavior (if destructors are not virtual);</p>
+<pre>
+   std::shared_ptr&lt;A&gt; a1(static_cast&lt;A*&gt;(new B));
+   a2.reset(static_cast&lt;A*&gt;(new B));</pre>
+<p>More commonly the up-cast of the pointer happens previously as in the following pattern:</p>
+<pre>
+   B* bPtr = new B;
+   ...
+   A* aPtr = b;
+   std::shared_ptr&lt;A&gt; a(aPtr);
+</pre>
+<p>&quot;capture on assignment&quot; can also be seen by looking at the following example:</p>
+<pre>
+   std::shared_ptr&lt;A&gt; a(static_cast&lt;A*&gt;(new B));
+   std::shared_ptr&lt;B&gt; b = std::static_pointer_cast&lt;B&gt;(a);
+   a.reset();
+   b.reset();</pre>
+<p>In this example only the destructor of A is invoked, although the last shared pointer to be released is of type &quot;B*&quot;. Again, this is because we assigned an instance of type &quot;A*&quot; in the first constructor.</p>
+</body>
+</html>
