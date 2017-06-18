@@ -179,8 +179,16 @@ release_shared()
 {
     if (--mStrong == 0)
     {
-        // TODO: Not exception safe.
+        // temp weak ptr around releasing the shared ptr. This is to ensure that
+        // the control block is kept alive during the dtor call.
+        // If the dtor tries to lock a weak ptr to self, then we would otherwise
+        // delete the control block inside the call to on_zero_shared
+        
+        ++mWeak;
+        // TODO: Not exception safe - but std spec says that if the dtor throws
+        // then functionality of standard library is undefined.
         on_zero_shared();
+        --mWeak;
         
         adjust();
     }

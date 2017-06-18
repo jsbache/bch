@@ -1080,6 +1080,38 @@ void BasicTests()
         cbValidator.ValidateInitialState();
         testInstanceValidator.ValidateInitialState();
     }
+    
+    // Ensure that a weak ptr cannot be resolved during a call to the destructor
+    {
+        class DtorTest;
+        typedef bch::shared_ptr_nc<DtorTest>    DtorTestPtr;
+        typedef bch::weak_ptr<DtorTest>         DtorTestWeakPtr;
+        class DtorTest
+        {
+        public:
+            static DtorTestPtr Create()
+            {
+                DtorTestPtr result(new DtorTest);
+                result->mWeakSelf = result;
+                return result;
+            }
+
+            ~DtorTest()
+            {
+                DtorTestPtr ptr = mWeakSelf.lock();
+                UNITTEST_REQUIRE(ptr == nullptr);
+            }
+
+        private:
+            DtorTest()
+            {
+            }
+            DtorTestWeakPtr     mWeakSelf;
+        };
+
+        DtorTestPtr test = DtorTest::Create();
+      
+    }
 }
 
 // -----------------------------------------------------------------------------
