@@ -39,9 +39,6 @@ Rules:
 class ControlBlock
 {
 public:
-#if BCH_SMART_PTR_UNITTEST
-    ~ControlBlock();
-#endif
 
     // Increase the strong reference count
     void add_shared() noexcept;
@@ -133,14 +130,6 @@ ControlBlock() noexcept :
     register_cb_ctor();
 #endif
 }
-
-#if BCH_SMART_PTR_UNITTEST
-inline ControlBlock::
-~ControlBlock()
-{
-    register_cb_dtor();
-}
-#endif
 
 inline void ControlBlock::
 add_shared() noexcept

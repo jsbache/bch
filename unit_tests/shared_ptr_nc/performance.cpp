@@ -99,7 +99,7 @@ void TestRun(unsigned int count, T functor)
 {
     sStart = false;
     typedef std::vector<std::thread> ThreadList;
-    std::auto_ptr<ThreadList> threads(new ThreadList);
+    std::unique_ptr<ThreadList> threads(new ThreadList);
     
     for (unsigned int index = 0; index < count; ++index)
     {

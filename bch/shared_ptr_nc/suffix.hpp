@@ -369,7 +369,7 @@ inline void detail::ControlBlock::adjust() noexcept
     if ((mStrong == 0) && (mWeak == 0))
     {
 #if BCH_SMART_PTR_UNITTEST
-        this->~ControlBlock();
+        register_cb_dtor();
 #endif
 
         free(this);
