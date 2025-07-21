@@ -2,17 +2,18 @@
 Copyright: Jesper Storm Bache (bache.name)
 */
 
-#include "./correctness.hpp"
+#include "correctness.hpp"
 
-#include <bch/shared_ptr_nc.hpp>
+#include "bch/shared_ptr_nc.hpp"
 
 #if BCH_SMART_PTR_UNITTEST
 #include <iostream>
 #include <cassert>
+#include <memory>
 
 namespace unittest {
 
-void Require(bool expr)
+static void Require(bool expr)
 {
     assert(expr);
 }
@@ -75,7 +76,7 @@ typedef InstanceValidator<ControlBlockWrapper>      ControlBlockInstanceValidato
 template <typename T>
 void ValidateStrongCount(const bch::shared_ptr_nc<T>& ptr, uint32_t value)
 {
-    UNITTEST_REQUIRE(ptr.strong_count() == value);
+    UNITTEST_REQUIRE(ptr.use_count() == value);
 }
 
 template <typename T>
@@ -102,7 +103,7 @@ struct TestInstance
 {
     TestInstance();
     ~TestInstance();
-    static int32_t LiveInstanceCount();
+    static uint32_t LiveInstanceCount();
 
     TestInstance(const TestInstance&) = delete;
     TestInstance(TestInstance&&) = delete;
@@ -110,9 +111,9 @@ struct TestInstance
     TestInstance& operator=(TestInstance&&) = delete;
 
 private:
-    static int32_t sInstanceCount;
+    static uint32_t sInstanceCount;
 };
-int32_t TestInstance::sInstanceCount = 0;
+uint32_t TestInstance::sInstanceCount = 0;
 
 TestInstance::TestInstance()
 {
@@ -123,7 +124,7 @@ TestInstance::~TestInstance()
     --sInstanceCount;
 }
 
-int32_t TestInstance::LiveInstanceCount()
+uint32_t TestInstance::LiveInstanceCount()
 {
     return sInstanceCount;
 }
@@ -135,16 +136,16 @@ struct TestInstanceSubclass: public TestInstance
 {
     TestInstanceSubclass();
     ~TestInstanceSubclass();
-    static int32_t LiveInstanceCount();
+    static uint32_t LiveInstanceCount();
 
     TestInstanceSubclass(const TestInstanceSubclass&) = delete;
     TestInstanceSubclass(TestInstanceSubclass&&) = delete;
     TestInstanceSubclass& operator=(const TestInstanceSubclass&) = delete;
     TestInstanceSubclass& operator=(TestInstanceSubclass&&) = delete;
 private:
-    static int32_t sInstanceCount;
+    static uint32_t sInstanceCount;
 };
-int32_t TestInstanceSubclass::sInstanceCount = 0;
+uint32_t TestInstanceSubclass::sInstanceCount = 0;
 
 TestInstanceSubclass::TestInstanceSubclass()
 {
@@ -156,7 +157,7 @@ TestInstanceSubclass::~TestInstanceSubclass()
     --sInstanceCount;
 }
 
-int32_t TestInstanceSubclass::LiveInstanceCount()
+uint32_t TestInstanceSubclass::LiveInstanceCount()
 {
     return sInstanceCount;
 }
@@ -169,7 +170,7 @@ struct TestInstanceVtable
 {
     TestInstanceVtable();
     virtual ~TestInstanceVtable();
-    static int32_t LiveInstanceCount();
+    static uint32_t LiveInstanceCount();
 
     TestInstanceVtable(const TestInstanceVtable&) = delete;
     TestInstanceVtable(TestInstanceVtable&&) = delete;
@@ -177,9 +178,9 @@ struct TestInstanceVtable
     TestInstanceVtable& operator=(TestInstanceVtable&&) = delete;
 
 private:
-    static int32_t sInstanceCount;
+    static uint32_t sInstanceCount;
 };
-int32_t TestInstanceVtable::sInstanceCount = 0;
+uint32_t TestInstanceVtable::sInstanceCount = 0;
 
 TestInstanceVtable::TestInstanceVtable()
 {
@@ -190,7 +191,7 @@ TestInstanceVtable::~TestInstanceVtable()
     --sInstanceCount;
 }
 
-int32_t TestInstanceVtable::LiveInstanceCount()
+uint32_t TestInstanceVtable::LiveInstanceCount()
 {
     return sInstanceCount;
 }
@@ -1128,8 +1129,8 @@ struct alignas(8) Test03
     
     void Fill(int v)
     {
-        for (int i = 0; i < sizeof(mValue)/sizeof(*mValue); ++i)
-            mValue[i] = v++;
+        for (std::size_t i = 0; i < sizeof(mValue)/sizeof(*mValue); ++i)
+            mValue[i] = static_cast<char>(v++);
     }
     char mValue[4];
 };
@@ -1145,6 +1146,29 @@ void AlignmentTest()
 
 // -----------------------------------------------------------------------------
 
+struct Test04: public bch::enable_shared_from_this<Test04>
+{
+    Test04() = default;
+    ~Test04() = default;
+};
+
+void SharedFromThisTest()
+{
+    {
+        bch::shared_ptr_nc<Test04> foo = bch::make_shared<Test04>();
+        auto foo_ptr = foo.get();
+        auto foo2 = foo_ptr->shared_from_this();
+        UNITTEST_REQUIRE(foo.get() == foo2.get());
+    }
+    
+    {
+        bch::shared_ptr_nc<Test04> foo(new Test04);
+        auto foo_ptr = foo.get();
+        auto foo2 = foo_ptr->shared_from_this();
+        UNITTEST_REQUIRE(foo.get() == foo2.get());
+    }
+}
+
 }   // namespace
 
 namespace bch {
@@ -1156,6 +1180,7 @@ try
 {
     BasicTests();
     AlignmentTest();
+    SharedFromThisTest();
 
     std::cout << "unit tests for shared_ptr_nc succeeded " << std::endl;
 }

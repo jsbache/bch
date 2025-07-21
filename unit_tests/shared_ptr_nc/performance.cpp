@@ -2,9 +2,9 @@
 Copyright: Jesper Storm Bache (bache.name)
 */
 
-#include "./performance.hpp"
+#include "performance.hpp"
 
-#include <bch/shared_ptr_nc.hpp>
+#include "bch/shared_ptr_nc.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -43,7 +43,7 @@ double ncPtrTime = 0;
 const unsigned int kTestCount = 100000000;
 std::atomic_bool sStart;
 
-void std_poiner()
+static void std_pointer()
 {
     while (!sStart) ;
 
@@ -69,7 +69,7 @@ void std_poiner()
     }
 }
 
-void nothread_poiner()
+static void nothread_pointer()
 {
     while (!sStart) ;
 
@@ -116,8 +116,8 @@ void TestRun(unsigned int count, T functor)
 
 void Test(unsigned int threadCount)
 {
-    TestRun(threadCount, std_poiner);
-    TestRun(threadCount, nothread_poiner);
+    TestRun(threadCount, std_pointer);
+    TestRun(threadCount, nothread_pointer);
 
     double delta = (stdPtrTime / ncPtrTime) * 100.0;
 

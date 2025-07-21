@@ -5,13 +5,15 @@ Copyright: Jesper Storm Bache (bache.name)
 #ifndef BCH_SHARED_PTR_PREFIX
 #define BCH_SHARED_PTR_PREFIX
 
+#pragma once
+
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
 #include <stdlib.h>
 #include <memory>
 
-#include <bch/common/header_prefix.hpp>
+#include "bch/common/header_prefix.hpp"
 
 namespace bch {
 
@@ -39,6 +41,7 @@ Rules:
 class ControlBlock
 {
 public:
+    virtual ~ControlBlock() = default;
 
     // Increase the strong reference count
     void add_shared() noexcept;
@@ -69,12 +72,15 @@ public:
     // Return true if the strong reference count is > 0
     bool has_shared_references() const noexcept;
 
+    std::uint32_t use_count() const {
+        return mStrong;
+    }
+
 #if BCH_SMART_PTR_UNITTEST
-    uint32_t strong_count() const;
-    uint32_t weak_count() const;
+    std::uint32_t weak_count() const;
 
     /// Number of live control block instances
-    static uint32_t live_instance_count() noexcept;
+    static std::uint32_t live_instance_count() noexcept;
 #endif
 
 protected:
@@ -112,8 +118,8 @@ private:
     close to it, but I choose the 32 bit value to leave a comfortable gap between the
     reference count value range and valid use cases.
     */
-    uint32_t    mStrong;
-    uint32_t    mWeak;
+    std::uint32_t    mStrong{1};
+    std::uint32_t    mWeak{0};
     
 #if BCH_SMART_PTR_UNITTEST
     static void register_cb_ctor() noexcept;
@@ -122,9 +128,7 @@ private:
 };
 
 inline ControlBlock::
-ControlBlock() noexcept :
-    mStrong(1),
-    mWeak(0)
+ControlBlock() noexcept
 {
 #if BCH_SMART_PTR_UNITTEST
     register_cb_ctor();
@@ -250,9 +254,16 @@ private:
     T*      mPtr;
 };
 
+/** shared_from_this support.
+In this case a tracked instance will store a pointer to its control block in
+a base class.
+set_shared_from_this is used to update this association */
+template <typename T>
+void set_shared_from_this(T* ptr, detail::ControlBlock* cb);
+
 }   // namespace detail
 }   //namespace bch
 
-#include <bch/common/header_suffix.hpp>
+#include "bch/common/header_suffix.hpp"
 
 #endif  // BCH_SHARED_PTR_PREFIX

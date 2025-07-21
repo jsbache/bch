@@ -4,7 +4,7 @@ Copyright: Jesper Storm Bache (bache.name)
 
 // Alignment prefix for bch headers: Set data alignment to be natural alignment
 
-#include <bch/common/compiler_settings.hpp>
+#include "bch/common/compiler_settings.hpp"
 
 #if BCH_PRAGMA_PACK_SUPPORT
 

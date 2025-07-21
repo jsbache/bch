@@ -10,10 +10,10 @@
 #include <iostream>
 #include <thread>
 
-#include <bch/shared_ptr_nc.hpp>
+#include "bch/shared_ptr_nc.hpp"
 
-#include "./correctness.hpp"
-#include "./performance.hpp"
+#include "correctness.hpp"
+#include "performance.hpp"
 
 namespace bch {
 
@@ -48,8 +48,8 @@ public:
 private:
     void Fill(int v)
     {
-        for (int i = 0; i < sizeof(mValue)/sizeof(*mValue); ++i)
-            mValue[i] = v++;
+        for (std::size_t i = 0; i < sizeof(mValue)/sizeof(*mValue); ++i)
+            mValue[i] = static_cast<char>(v++);
     }
     char mValue[4];
 };
@@ -77,59 +77,10 @@ void Foo(T value)
     value->Baz();
 }
 
-const unsigned int kTestCount = 100000000;
-//    const unsigned int kTestCount = 1;
-
 std::mutex mutex;
 double stdPtrTime = 0;
 double noThreadTime = 0;
 
-void std_poiner()
-{
-    typedef std::chrono::time_point<std::chrono::system_clock> TimerType;
-    TimerType start = std::chrono::system_clock::now();
-
-
-    std::shared_ptr<Test> stdValue(new Test);
-    for (unsigned int i = 0; i < kTestCount; ++i)
-    {
-        Foo(stdValue);
-    }
-    TimerType end = std::chrono::system_clock::now();
- 
-    std::chrono::duration<double> elapsed_seconds = end-start;
-
-    double elapsed = elapsed_seconds.count();;
-    {
-        mutex.lock();
-        stdPtrTime += elapsed;
-        std::cout << "Time with std::shared_ptr is " << elapsed << std::endl;
-        mutex.unlock();
-    }
-}
-
-void nothread_poiner()
-{
-    typedef std::chrono::time_point<std::chrono::system_clock> TimerType;
-    TimerType start = std::chrono::system_clock::now();
-
-    shared_ptr_nc<Test> stdValue(new Test);
-    for (unsigned int i = 0; i < kTestCount; ++i)
-    {
-        Foo(stdValue);
-    }
-    TimerType end = std::chrono::system_clock::now();
- 
-    std::chrono::duration<double> elapsed_seconds = end-start;
-    double elapsed = elapsed_seconds.count();
-
-    {
-        mutex.lock();
-        noThreadTime += elapsed;
-        std::cout << "Time with no-thread::shared_ptr_nc is " << elapsed << std::endl;
-        mutex.unlock();
-    }
-}
 class SizeTest
 {
     char x;
@@ -155,18 +106,19 @@ namespace example {
 typedef int MyObject;
 typedef std::shared_ptr<MyObject> MyObjectPtr;
 
-void Foo(MyObject& object)
+static void Foo(MyObject& object)
 {
 }
 
-void Bar(const std::shared_ptr<MyObject>& pointer)
+static void Bar(const std::shared_ptr<MyObject>& pointer)
 {
 }
 
-void Baz()
+static void Baz()
 {
     MyObjectPtr instance;
     Foo(*instance);
     Bar(instance);
 }
+
 }   // namespace example

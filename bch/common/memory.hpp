@@ -3,10 +3,13 @@ Copyright: Jesper Storm Bache (bache.name)
 */
 
 #ifndef BCH_MEMORY
+#define BCH_MEMORY
+
+#pragma once
 
 #include <cstddef>
 
-#include <bch/common/header_prefix.hpp>
+#include "bch/common/header_prefix.hpp"
 
 namespace bch {
 
@@ -31,6 +34,6 @@ void AllocateInstancePair(  std::size_t size1,
 
 }   // namespace bch
 
-#include <bch/common/header_suffix.hpp>
+#include "bch/common/header_suffix.hpp"
 
 #endif  // BCH_MEMORY

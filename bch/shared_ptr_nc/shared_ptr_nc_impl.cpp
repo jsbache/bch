@@ -2,7 +2,7 @@
 Copyright: Jesper Storm Bache (bache.name)
 */
 
-#include <bch/shared_ptr_nc.hpp>
+#include "bch/shared_ptr_nc.hpp"
 
 #if BCH_SMART_PTR_UNITTEST
 #include <atomic>

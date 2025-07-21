@@ -3,8 +3,9 @@ Copyright: Jesper Storm Bache (bache.name)
 */
 
 #ifndef BCH_SHARED_PTR_PERFORMANCE_TESTS
+#define BCH_SHARED_PTR_PERFORMANCE_TESTS
 
-#include <bch/common/header_prefix.hpp>
+#include "bch/common/header_prefix.hpp"
 
 namespace bch {
 namespace unittest {
@@ -16,6 +17,6 @@ void TestPerformance();
 }   // namespace unittest
 }   // namespace bch
 
-#include <bch/common/header_suffix.hpp>
+#include "bch/common/header_suffix.hpp"
 
 #endif  // BCH_SHARED_PTR_PERFORMANCE_TESTS
